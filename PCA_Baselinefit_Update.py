@@ -27,7 +27,7 @@ Path_Raw_cleaned2 = 'Dans_Data_raw_cleaned2.csv'
 
 # This is where I select which database is used to make the baselines.
 DB_Name = Path_Raw_cleaned2
-DB_path = Path.cwd().joinpath(DB_Name)
+DB_Path = Path.cwd().joinpath(DB_Name)
 df_cleaned = pd.read_csv(DB_Path, index_col='Wavenumber')
 frame=df_cleaned
 
