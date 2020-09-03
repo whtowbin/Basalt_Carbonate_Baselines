@@ -48,7 +48,8 @@ for filename in all_files:
 Dan_FTIR = pd.concat(li, axis=1, )
 
 Dan_FTIR_select = Dan_FTIR.loc[wn_low:wn_high]
-
+Spectrum2 = Dan_FTIR_select.iloc[:, 1].values.reshape(
+    len(Dan_FTIR_select.iloc[:, 0]), 1)
 #data = Spectrum2[:,0]
 P_spect2 = [5.50728127e+00, -6.83405880e-01, -1.10914328e+00, 1.18137238e-01, -1.79234709e-01, 1430, 30, 0.2, 1515, 30, 0.2, 4.79900159e-04, 2.36431464e-01]
 # %%
@@ -79,8 +80,8 @@ def Gauss(x, mu, sd, A=1):
 
 #%%
 def linear2(x, tilt, offset):
-    offset = np.ones(len(x)) * offset
-    tilt = np.arange(0, len(x)) * tilt 
+    offset = np.ones_like(x) * offset
+    tilt = np.arange(0, max(x.shape)) * tilt 
     tilt_offset = tilt + offset 
     return tilt_offset
 # %%
@@ -98,12 +99,12 @@ def carbonate(P, x, PCAmatrix, Nvectors): # add terms M and X, PCA_fit terms
     G1430 = Gauss(x, peak_G1430, std_G1430, A=G1430_amplitude)
 
     linear_offset = linear2(x,slope, offset) 
-    
-    
 
     baseline =  PCA_Weights * PCAmatrix.T
     model_data = baseline + linear_offset + G1515 + G1430 
+    dict = {'baseline': baseline,  'linear_offset': linear_offset, 'G1515': G1515, 'G1430': G1430}
     return np.array(model_data)[0,:]
+    #return dict
 # %%
 # Synthetic data
 uncert = np.ones_like(Wavenumber[0,:])*0.01
