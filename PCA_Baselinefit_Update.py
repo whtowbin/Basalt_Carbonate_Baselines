@@ -98,8 +98,8 @@ plt.plot(Wavenumber, PCA_vectors[1], label="PCA:2")
 plt.plot(Wavenumber, PCA_vectors[2], label="PCA:3")
 plt.plot(Wavenumber, PCA_vectors[3], label="PCA:4")
 plt.plot(Wavenumber, PCA_vectors[4], label="PCA:5")
-plt.plot(Wavenumber, PCA_vectors[5], label="PCA:6")
-plt.plot(Wavenumber, PCA_vectors[6], label="PCA:7")
+#plt.plot(Wavenumber, PCA_vectors[5], label="PCA:6")
+#plt.plot(Wavenumber, PCA_vectors[6], label="PCA:7")
 #plt.plot(Wavenumber, PCA_vectors[7], label="PCA:8")
 plt.legend()
 ax.invert_xaxis()
@@ -107,7 +107,7 @@ ax.legend()
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
 plt.savefig('component_plot.png')
-
+# %%
 
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
@@ -182,7 +182,7 @@ Spectrum = open_spectrum(Sarah_path)
 sarahFTIR = StandardScaler(with_std=False).fit_transform(Spectrum)
 sarahFTIR = Spectrum
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spec=sarahFTIR, n_PCA_vectors=6, PCA_vectors=PCA_vectors)
+    Spec=sarahFTIR, n_PCA_vectors=5, PCA_vectors=PCA_vectors)
 
 
 plot_Baseline_results(sarahFTIR, Baseline_Matrix=Baseline_Matrix,
@@ -214,7 +214,7 @@ Spectrum1 = Dan_FTIR_select.iloc[:, 0].values.reshape(
 Spectrum1 = StandardScaler(with_std=False).fit_transform(Spectrum1)
 
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum1, n_PCA_vectors=6, PCA_vectors=PCA_vectors)
+    Spectrum1, n_PCA_vectors=9, PCA_vectors=PCA_vectors)
 plot_Baseline_results(Spectrum1, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.title('CL05MI01.csv')
@@ -225,9 +225,9 @@ plt.savefig('CL05MI01_baselinefit.png')
 
 Spectrum2 = Dan_FTIR_select.iloc[:, 1].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
-Spectrum2 = StandardScaler(with_std=False).fit_transform(Spectrum2)
+#Spectrum2 = StandardScaler(with_std=False).fit_transform(Spectrum2)
 Baseline_Matrix1, fit_param1 = Carbonate_baseline_fit(
-    Spectrum2, n_PCA_vectors=7, PCA_vectors=PCA_vectors)
+    Spectrum2, n_PCA_vectors=5, PCA_vectors=PCA_vectors)
 plot_Baseline_results(Spectrum2, Baseline_Matrix=Baseline_Matrix1,
                       fit_param=fit_param1, Wavenumber=Wavenumber)
 plt.title('CL05MI02.csv')
