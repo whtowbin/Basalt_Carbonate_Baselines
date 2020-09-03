@@ -32,7 +32,7 @@ Spectrum = open_spectrum(Sarah_path)
 sarahFTIR = Spectrum
 spec = sarahFTIR.to_numpy()[:,0]
 data = spec
-uncert = np.ones_like(x)*0.001
+uncert = np.ones_like(spec)*0.001
 #%%
 # Dans Spectrum 
 Path_Dan_test = Path.cwd().joinpath("Dans_Examples")
@@ -102,7 +102,7 @@ def carbonate(P, x, PCAmatrix, Nvectors): # add terms M and X, PCA_fit terms
 
     baseline =  PCA_Weights * PCAmatrix.T
     model_data = baseline + linear_offset + G1515 + G1430 
-    dict = {'baseline': baseline,  'linear_offset': linear_offset, 'G1515': G1515, 'G1430': G1430}
+    #dict = {'baseline': baseline,  'linear_offset': linear_offset, 'G1515': G1515, 'G1430': G1430}
     return np.array(model_data)[0,:]
     #return dict
 # %%
@@ -120,11 +120,11 @@ func = carbonate
 indparams = [x, PCAmatrix, Nvectors]
 
 # Array of initial-guess values of fitting parameters:
-#params = np.float64(np.array([7.73646458, -9.52374283e-01, -8.28969527e-01,1.72901441e-01, -2.32678933e-01, 1430, 30, 0.1, 1515, 30, 0.1, 7e-5, 0.65]))
-params = np.float64(np.array([3.73646458, -3.52374283e-01, -3.28969527e-01,0.72901441e-01, -0.32678933e-01, 1428, 25, 0.12, 1513, 25, 0.12, 2e-5, 0.15]))
+params = np.float64(np.array([7.73646458, -9.52374283e-01, -8.28969527e-01,1.72901441e-01, -2.32678933e-01, 1430, 30, 0.1, 1515, 30, 0.1, 7e-5, 0.65]))
+#params = np.float64(np.array([3.73646458, -3.52374283e-01, -3.28969527e-01,0.72901441e-01, -0.32678933e-01, 1428, 25, 0.12, 1513, 25, 0.12, 7e-5, 0.65]))
 # Lower and upper boundaries for the MCMC exploration:
-pmin = np.float64(np.array([0, -3, -3, -3, -3, 1428, 25, 0.001, 1513, 25, 0.001, -1.0, -2]))
-pmax = np.float64(np.array([10, 3, 3, 3, 3, 1435, 35, 0.5, 1520, 35, 0.5, 1.0, 2]))
+pmin = np.float64(np.array([0, -3, -3, -3, -3, 1428, 25, 0.001, 1513, 25, 0.001, -1.0, -5]))
+pmax = np.float64(np.array([10, 3, 3, 3, 3, 1435, 35, 0.5, 1520, 35, 0.5, 1.0, 5]))
 # Parameters' stepping behavior:
 pstep = 0.05* np.abs(np.array([7.73646458, -9.52374283e-01, -8.28969527e-01,1.72901441e-01, -2.32678933e-01, 5.0, 5.0, 1.0, 5.0, 5.0, 1.0, 7e-5, 0.65]))
 #np.abs(params*0.05)
@@ -174,9 +174,9 @@ rms      = True
 wlike = False
 
 # Run the MCMC:
-"""
+
 mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
-     indparams=indparams,
+     indparams=indparams, pstep=pstep,
      pnames=pnames, texnames=texnames,
      sampler=sampler, nsamples=nsamples,  nchains=nchains,
      ncpu=ncpu, burnin=burnin, thinning=thinning,
@@ -185,10 +185,11 @@ mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
      hsize=hsize, kickoff=kickoff,
      wlike=wlike, log=log,
      plots=plots, savefile=savefile, rms=rms)
-"""
+
+
 #data = Spectrum.to_numpy()[:,0]
 #uncert = np.ones_like(x)*0.0001
-
+"""
 mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
      indparams=indparams, pmin=pmin, pmax=pmax, pstep=pstep,
      pnames=pnames, texnames=texnames, priorlow=priorlow, priorup=priorup,
@@ -199,35 +200,15 @@ mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
      hsize=hsize, kickoff=kickoff,
      wlike=wlike, log=log,
      plots=plots, savefile=savefile, rms=rms)
-
+"""
 #%%
 #
 
 # %%
-# Loads One of Sarah's Spectra. We can easily modify this to load them all like I have done with Dan's below
-wn_high = 2400
-wn_low = 1250
-Sarah_path = Path.cwd().joinpath("Sarah's FTIR Spectra/Fuego2018FTIRSpectra_Transmission/AC4_OL49_021920_30x30_H2O_b.CSV")
-
-def open_spectrum(path, wn_high=wn_high, wn_low=wn_low):
-    df = pd.read_csv(path, index_col=0, header=0,
-                     names=['Wavenumber', 'Absorbance'])
-    spec = df.loc[wn_low:wn_high]
-    return spec
-
-Spectrum = open_spectrum(Sarah_path)
-# %%
-
-#This line subtracts the mean from your data
-sarahFTIR = StandardScaler(with_std=False).fit_transform(Spectrum)
-sarahFTIR = Spectrum
-spec = Spectrum.to_numpy()[:,0]
-# Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-#    Spec=sarahFTIR, n_PCA_vectors=4, PCA_vectors=PCA_vectors)
+# plot results
 
 
-# plot_Baseline_results(sarahFTIR, Baseline_Matrix=Baseline_Matrix,
-#                      fit_param=fit_param, Wavenumber=Wavenumber)
-# plt.title('AC4_OL49')
-# plt.savefig('AC4_OL49_baselinefit.png')
-# %%
+pca_results = np.array([mc3_output['meanp'][0:Nvectors]])
+Baseline_Solve = pca_results * PCAmatrix.T
+line_results = mc3_output['meanp'][-1,None]
+line2 = linear2(x, line_results[0], line_results[1])
