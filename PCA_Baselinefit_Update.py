@@ -50,20 +50,32 @@ def linear(x,m):
 # %%
 
 #Select subset of the database spectra by wavenumber
-wn_high = 2400
-wn_low = 1250
+#wn_high = 2400
+#wn_low = 1250
+
+wn_high = 1800
+wn_low = 1500
 Wavenumber = frame.loc[wn_low:wn_high].index
 
 frame_select = frame.loc[wn_low:wn_high]
 Data = frame_select.values
 
+# %%
+#Normalize Data for scaling data only
+"""
+data_range= (Data[-1,:]-Data[0,:])
+scaled_data = Data / data_range
+Data = -scaled_data + scaled_data.mean(axis =0) -.3
+"""
 #%%
 # Subtract the mean from each column
+
 Data = Data - Data.mean(axis =0)
+
 # %%
 # Plots the database
 fig, ax = plt.subplots(figsize=(12, 6))
-plt.plot(Data)
+plt.plot(Wavenumber, Data)
 
 ax.invert_xaxis()
 
@@ -96,8 +108,8 @@ fig, ax = plt.subplots(figsize=(12,6))
 plt.plot(Wavenumber, PCA_vectors[0], label="PCA:1")
 plt.plot(Wavenumber, PCA_vectors[1], label="PCA:2")
 plt.plot(Wavenumber, PCA_vectors[2], label="PCA:3")
-plt.plot(Wavenumber, PCA_vectors[3], label="PCA:4")
-plt.plot(Wavenumber, PCA_vectors[4], label="PCA:5")
+#plt.plot(Wavenumber, PCA_vectors[3], label="PCA:4")
+#plt.plot(Wavenumber, PCA_vectors[4], label="PCA:5")
 #plt.plot(Wavenumber, PCA_vectors[5], label="PCA:6")
 #plt.plot(Wavenumber, PCA_vectors[6], label="PCA:7")
 #plt.plot(Wavenumber, PCA_vectors[7], label="PCA:8")

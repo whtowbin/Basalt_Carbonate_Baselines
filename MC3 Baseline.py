@@ -33,6 +33,7 @@ sarahFTIR = Spectrum
 spec = sarahFTIR.to_numpy()[:,0]
 data = spec
 uncert = np.ones_like(spec)*0.001
+error  = np.random.normal(0, uncert)
 #%%
 # Dans Spectrum 
 Path_Dan_test = Path.cwd().joinpath("Dans_Examples")
@@ -50,7 +51,8 @@ Dan_FTIR = pd.concat(li, axis=1, )
 Dan_FTIR_select = Dan_FTIR.loc[wn_low:wn_high]
 Spectrum2 = Dan_FTIR_select.iloc[:, 1].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
-#data = Spectrum2[:,0]
+data = Spectrum2[:,0]
+
 P_spect2 = [5.50728127e+00, -6.83405880e-01, -1.10914328e+00, 1.18137238e-01, -1.79234709e-01, 1430, 30, 0.2, 1515, 30, 0.2, 4.79900159e-04, 2.36431464e-01]
 # %%
 #P_spect2 = [5.50728127e+00, -.5, -.8, 0, 0, 1430, 30, 0.2, 1515, 30, 0.2, 0, 0.4]
@@ -58,6 +60,7 @@ P_spect2 = [5.50728127e+00, -6.83405880e-01, -1.10914328e+00, 1.18137238e-01, -1
 dan_out = carbonate(P_spect2, x, PCAmatrix, Nvectors)
 plt.plot(x[0,:],dan_out)
 plt.plot(x[0,:],Spectrum2[:,0])
+
 # %%
 Nvectors = 5
 PCA_DF = pd.read_csv("PCA_Matrix.CSV", index_col= "Wavenumber")
@@ -107,9 +110,9 @@ def carbonate(P, x, PCAmatrix, Nvectors): # add terms M and X, PCA_fit terms
     #return dict
 # %%
 # Synthetic data
-uncert = np.ones_like(Wavenumber[0,:])*0.01
-error  = np.random.normal(0, uncert)
-data   = carbonate(P, x, PCAmatrix, Nvectors) + error
+#uncert = np.ones_like(Wavenumber[0,:])*0.01
+#error  = np.random.normal(0, uncert)
+#data   = carbonate(P, x, PCAmatrix, Nvectors) + error
 # %%
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -123,8 +126,11 @@ indparams = [x, PCAmatrix, Nvectors]
 params = np.float64(np.array([7.73646458, -9.52374283e-01, -8.28969527e-01,1.72901441e-01, -2.32678933e-01, 1430, 30, 0.1, 1515, 30, 0.1, 7e-5, 0.65]))
 #params = np.float64(np.array([3.73646458, -3.52374283e-01, -3.28969527e-01,0.72901441e-01, -0.32678933e-01, 1428, 25, 0.12, 1513, 25, 0.12, 7e-5, 0.65]))
 # Lower and upper boundaries for the MCMC exploration:
-pmin = np.float64(np.array([0, -3, -3, -3, -3, 1428, 25, 0.001, 1513, 25, 0.001, -1.0, -5]))
-pmax = np.float64(np.array([10, 3, 3, 3, 3, 1435, 35, 0.5, 1520, 35, 0.5, 1.0, 5]))
+#pmin = np.array([0, -3, -3, -3, -3, 1428, 25, 0.001, 1513, 25, 0.001, -1.0, -5])
+#pmax = np.array([10, 3, 3, 3, 3, 1435, 35, 0.5, 1525, 35, 0.5, 1.0, 5])
+
+pmin = params - params*5
+pmax = params + params*5
 # Parameters' stepping behavior:
 pstep = 0.05* np.abs(np.array([7.73646458, -9.52374283e-01, -8.28969527e-01,1.72901441e-01, -2.32678933e-01, 5.0, 5.0, 1.0, 5.0, 5.0, 1.0, 7e-5, 0.65]))
 #np.abs(params*0.05)
@@ -177,6 +183,7 @@ wlike = False
 
 mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
      indparams=indparams, pstep=pstep,
+     priorlow=priorlow, priorup=priorup,
      pnames=pnames, texnames=texnames,
      sampler=sampler, nsamples=nsamples,  nchains=nchains,
      ncpu=ncpu, burnin=burnin, thinning=thinning,
@@ -206,9 +213,36 @@ mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
 
 # %%
 # plot results
-
+fig, ax = plt.subplots(figsize= (12,6))
+plt.plot(x[0,:],carbonate(mc3_output['meanp'], x, PCAmatrix, Nvectors))
+plt.plot(x[0,:],data)
+ax.invert_xaxis()
+plt.xlabel('Wavenumber')
+plt.ylabel('Absorbance')
+#%%
 
 pca_results = np.array([mc3_output['meanp'][0:Nvectors]])
 Baseline_Solve = pca_results * PCAmatrix.T
-line_results = mc3_output['meanp'][-1,None]
-line2 = linear2(x, line_results[0], line_results[1])
+line_results = mc3_output['meanp'][-2:None]
+line = linear2(x, line_results[0], line_results[1])
+Baseline_Solve = Baseline_Solve + line
+
+peak_G1515, std_G1515, G1515_amplitude = mc3_output['meanp'][-5:-2]
+peak_G1430, std_G1430, G1430_amplitude = mc3_output['meanp'][-8:-5]
+
+G1515 = Gauss(x, peak_G1515, std_G1515, A=G1515_amplitude)
+G1430 = Gauss(x, peak_G1430, std_G1430, A=G1430_amplitude)
+
+# %%
+fig, ax = plt.subplots(figsize= (12,6))
+plt.plot(x[0,:], data)
+#plt.plot(x[0,:], G1515.T + Baseline_Solve.T)
+#plt.plot(x[0,:], G1430.T + Baseline_Solve.T)
+plt.plot(x[0,:], carbonate(mc3_output['meanp'], x, PCAmatrix, Nvectors))
+plt.plot(x[0,:], Baseline_Solve.T)
+
+ax.invert_xaxis()
+plt.xlabel('Wavenumber')
+plt.ylabel('Absorbance')
+
+# %%
