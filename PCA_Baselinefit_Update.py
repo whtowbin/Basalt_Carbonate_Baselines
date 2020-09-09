@@ -50,11 +50,11 @@ def linear(x,m):
 # %%
 
 #Select subset of the database spectra by wavenumber
-#wn_high = 2400
-#wn_low = 1250
+wn_high = 2400
+wn_low = 1250
 
-wn_high = 1800
-wn_low = 1500
+#wn_high = 1800
+#wn_low = 1500
 Wavenumber = frame.loc[wn_low:wn_high].index
 
 frame_select = frame.loc[wn_low:wn_high]
@@ -69,8 +69,23 @@ Data = -scaled_data + scaled_data.mean(axis =0) -.3
 """
 #%%
 # Subtract the mean from each column
+#Data = Data - Data.mean(axis =0)
+# %%
+#Normalize Data for scaling 
+def scale_data(Data, Wavenumber):
+    """
+    Scales the data and subtracts the mean spectrum 
+    """
+    #Data = Data - Data.mean(axis =0)
+    data_range= (Data[0,:]-Data[-1,:])
+    scaled_data = Data / data_range
+    
+    Data = scaled_data - scaled_data[0,:] +0.5
+    Mean_baseline= Data.mean(axis=1) 
+    Data = Data - np.array([Mean_baseline]).T
+    return Data, Mean_baseline
 
-Data = Data - Data.mean(axis =0)
+Data, Mean_baseline = scale_data(Data, Wavenumber)
 
 # %%
 # Plots the database
@@ -121,6 +136,34 @@ ax.set_ylabel('Absorbance')
 plt.savefig('component_plot.png')
 # %%
 
+fig, ax = plt.subplots(figsize=(12,6))
+
+plt.plot(Wavenumber, Mean_baseline, label = 'Average Baseline' ,linewidth=3)
+plt.plot(Wavenumber, Mean_baseline+PCA_vectors[0]*1, label = 'Average Baseline + PCA1')
+plt.plot(Wavenumber, Mean_baseline-PCA_vectors[0]*1, label = 'Average Baseline - PCA1')
+#plt.plot(Wavenumber, Mean_baseline-PCA_vectors[0]*2, label = 'Average Baseline - PCA1 *2')
+
+plt.legend()
+ax.invert_xaxis()
+ax.legend()
+ax.set_xlabel('Wavenumber')
+ax.set_ylabel('Absorbance')
+plt.savefig('PCA1_plot.png')
+
+#%%
+fig, ax = plt.subplots(figsize=(12,6))
+
+plt.plot(Wavenumber, Mean_baseline, label = 'Average Baseline', linewidth=3)
+plt.plot(Wavenumber, Mean_baseline+PCA_vectors[1]*1, label = 'Average Baseline + PCA2')
+plt.plot(Wavenumber, Mean_baseline-PCA_vectors[1]*1, label = 'Average Baseline - PCA2')
+#plt.plot(Mean_baseline-PCA_vectors[1]*2, label = 'Average Baseline + PCA2 *2')
+
+plt.legend()
+ax.invert_xaxis()
+ax.legend()
+ax.set_xlabel('Wavenumber')
+ax.set_ylabel('Absorbance')
+plt.savefig('PCA1_plot.png')
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
 Peak1 = pd.Series( Lorentzian(x=Wavenumber, center=1635, half_width=55, amp=1),index=Wavenumber)
@@ -130,9 +173,9 @@ Peak3 = pd.Series(Gauss(x=Wavenumber, mu=1515, sd=30, A=1), index=Wavenumber)
 # %%
 # Function to fit the baselines: 
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
+Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
 
-
-def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak2=Peak2, Peak3=Peak3):
+def Carbonate_baseline_fit(Spec, Average_baseline, PCA_vectors, n_PCA_vectors=2, Peak1=Peak1, Peak2=Peak2, Peak3=Peak3):
 
     PCA_DF = pd.DataFrame(PCA_vectors[0:n_PCA_vectors].T, index=Wavenumber)
     
@@ -140,7 +183,7 @@ def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak
     tilt = pd.Series(np.arange(0, len(Peak2)), index=Wavenumber)
 
     
-    Baseline_Matrix = pd.concat([PCA_DF, offset, tilt, Peak2, Peak3], axis=1)
+    Baseline_Matrix = pd.concat([Average_baseline, PCA_DF, offset, tilt, Peak2, Peak3], axis=1)
 
     # This line is only used if we are fitting the Water peak with the CO2 peak. 
     #Baseline_Matrix = pd.concat([PCA_DF, offset, tilt, Peak2, Peak3, Peak1], axis=1)
@@ -154,7 +197,7 @@ def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak
 # %%
 # plots the results
 
-def plot_Baseline_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
+def plot_Baseline_results(Spectrum,  Baseline_Matrix, fit_param, Wavenumber):
     modeled_basline = np.matrix(
         Baseline_Matrix[:, 0:-2])*fit_param[0][0:-2]  # Ignores the Peaks in fit.
 
@@ -194,7 +237,7 @@ Spectrum = open_spectrum(Sarah_path)
 sarahFTIR = StandardScaler(with_std=False).fit_transform(Spectrum)
 sarahFTIR = Spectrum
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spec=sarahFTIR, n_PCA_vectors=5, PCA_vectors=PCA_vectors)
+    Spec=sarahFTIR, Average_baseline =Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
 
 
 plot_Baseline_results(sarahFTIR, Baseline_Matrix=Baseline_Matrix,

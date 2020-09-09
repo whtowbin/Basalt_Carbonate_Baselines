@@ -1,6 +1,4 @@
 # %%
-from Users.henry..vscode.extensions.ms-python.vscode-pylance-2020.8.3.server.bundled-stubs.matplotlib.pyplot import colorbar
-from Users.henry.Python Files.Basalt Carbonate Baselines.MC3 Baseline import wn_low
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,9 +11,10 @@ from pathlib import Path
 # %%
 # This is a list of the baseline databases to choose from. We will probably change this as we go. 
 
-original = 'Dans_Data.csv'
+
+original_cleaned = 'Dans_Data_raw_cleaned.csv'
 # Water Peak removed by Dan and smoothed for noise
-NoH2O_Path_smoothed= 'Dans_smoothed_no_H2O.csv'
+NoH2O_Path_smoothed= 'Dans_smoothed_no_H2O2.csv'
 
 # Water Peak removed by Dan, smoothed for noise, and the data has been offset 
 # and scaled to make the spectra fit through the same point at the starting and ending wavenumber 
@@ -29,12 +28,18 @@ Path_Raw_cleaned2 = 'Dans_Data_raw_cleaned2.csv'
 # From my experience this is the best maybe we can figureout how to remove the water in this. 
 
 # This is where I select which database is used to make the baselines.
-DB_Name = original #NoH2O_Path_smoothed #Path_Raw_cleaned2
+DB_Name = NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
 DB_Path = Path.cwd().joinpath(DB_Name)
 df_cleaned = pd.read_csv(DB_Path, index_col='Wavenumber')
 frame=df_cleaned
-
 Wavenumber = df_cleaned.index
+
+# %%
+H2O_DB_Name = original_cleaned 
+H2O_DB_Path = Path.cwd().joinpath(H2O_DB_Name)
+H2O_df_cleaned = pd.read_csv(H2O_DB_Path, index_col='Wavenumber')
+H2O_frame=H2O_df_cleaned
+H2O_Wavenumber = H2O_df_cleaned.index
 
 # %%
 # Defining the Peaks shapes
@@ -53,45 +58,74 @@ def linear(x,m):
 # %%
 
 #Select subset of the database spectra by wavenumber
-#wn_high = 2400
 
-wn_high = 1500
+
+#wn_high = 1500
 wn_low = 1250
+wn_high = 2400
 
 #wn_low = 1800
 #wn_low = 1500
 Wavenumber = frame.loc[wn_low:wn_high].index
 
 frame_select = frame.loc[wn_low:wn_high]
-Data = frame_select.values
+Data_init = frame_select.values
 
+H2O_frame_select = H2O_frame.loc[wn_low:wn_high]
+H2O_Data_init = H2O_frame_select.values
 
 #%%
 # Subtract the mean from each column
-Data = Data - Data.mean(axis =0)
+"""
+Mean_baseline= Data.mean(axis=1) 
+Data = Data - Data.mean(axis=0)
+Data = Data - np.array([Mean_baseline]).T
+"""
 # %%
 #Normalize Data for scaling 
+def scale_data(Data, Wavenumber):
+    """
+    Scales the data and subtracts the mean spectrum 
+    """
+    #Data = Data - Data.mean(axis =0)
+    data_range= (Data[0,:]-Data[-1,:])
+    scaled_data = Data / data_range
+    
+    Data = scaled_data - scaled_data[0,:] +0.5
+    Mean_baseline= Data.mean(axis=1) 
+    Data = Data - np.array([Mean_baseline]).T
+    return Data, Mean_baseline
+
+Data, Mean_baseline = scale_data(Data_init, Wavenumber)
+
+#H2O_Data, H2O_Mean_baseline = scale_data(H2O_Data, Wavenumber)
 
 
-data_range= (Data[0,:]-Data[-1,:])
-scaled_data = Data / data_range
-#Data = scaled_data + scaled_data.mean(axis =0) 
-Data = scaled_data - scaled_data[0,:] +0.5
-Mean_baseline= Data.mean(axis=1) 
-Data = Data - np.array([Mean_baseline]).T
+# %%
+def savgol_filter(x):
+    return signal.savgol_filter(x, 101, 3)
+
+Smoothed= np.apply_along_axis(savgol_filter,0,Data)
+
+fig, ax = plt.subplots(figsize=(12, 6))
+plt.plot(Wavenumber,Smoothed)
+ax.invert_xaxis()
+
+
 # %%
 # Plots the database
 fig, ax = plt.subplots(figsize=(12, 6))
 plt.plot(Wavenumber, Data)
-
+plt.plot(Wavenumber, Smoothed)
 ax.invert_xaxis()
 
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
-
+#%%
+Data = Smoothed
 # %%
 # Calculates the Principle components
-pca = PCA(10, ) # Number of PCA vectors to calculate 
+pca = PCA(4, ) # Number of PCA vectors to calculate 
 
 principalComponents = pca.fit(Data.T) #everything appears to work best with the raw data or raw data scaled
 
@@ -208,8 +242,26 @@ ax.set_xlabel(x.name)
 ax.set_ylabel(y.name)
 cbar.set_label(z.name)
 
+# %%
+# Make Dataframes without Water peak for improved to fit 
+def H2O_peak_cut(df, wn_cut_low, wn_cut_high):
+    No_Peaks_Frame = df.drop(df[1500:1800].index)
+    return No_Peaks_Frame
+
+No_Peaks_Frame = H2O_frame_select.drop(H2O_frame_select[1500:1800].index)
+No_Peaks_Wn = No_Peaks_Frame.index
+No_Peaks_Data = No_Peaks_Frame.values
 
 
+PCA_DF = pd.DataFrame(PCA_vectors[0:2], index = Wavenumber)
+
+
+Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
+Avg_BSL_no_peaks = Average_baseline.drop(Average_baseline)
+
+
+# Next do the same thing for the PCA components. Remove the area between the peaks and then use that as an input for the Least Squares
+# Then replace all the H2O data with the PCA fits and save all the baseline subtracted peak shapes 
 
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
@@ -218,11 +270,53 @@ Peak2 = pd.Series(Gauss(x=Wavenumber, mu=1430, sd=30, A=1), index=Wavenumber)
 Peak3 = pd.Series(Gauss(x=Wavenumber, mu=1515, sd=30, A=1), index=Wavenumber)
 
 # %%
-# Function to fit the baselines: 
+# Function to fit Water free baselines 
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
 
 
-def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak2=Peak2, Peak3=Peak3):
+def No_H2O_fit(Spec, Average_baseline, PCA_vectors, n_PCA_vectors=2, Wavenumber = Wavenumber):
+
+    PCA_DF = pd.DataFrame(PCA_vectors[0:n_PCA_vectors].T, index=Wavenumber)
+    
+    offset = pd.Series(np.ones(len(Peak2)), index= Wavenumber)
+    tilt = pd.Series(np.arange(0, len(Peak2)), index=Wavenumber)
+    
+    Baseline_Matrix = pd.concat([Average_baseline, PCA_DF, offset, tilt,], axis=1)
+
+    Baseline_Matrix = np.matrix(Baseline_Matrix)
+
+    fit_param = np.linalg.lstsq(Baseline_Matrix, Spec)  
+
+    return Baseline_Matrix, fit_param
+# %%
+def plot_NoH2O_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
+
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    #plt.plot(Wavenumber,Spectrum.values, label = "Spectrum") for Pandas
+    plt.plot(Wavenumber, Spectrum, label="Spectrum")
+
+    plt.plot(Wavenumber,np.matrix(Baseline_Matrix)*fit_param[0], label = 'Modeled Fit')
+    plt.plot(Wavenumber,modeled_basline, label='Baseline')
+
+    #Peak1_amp = fit_param[0][-1]
+    #Peak2_amp = fit_param[0][-3]
+    #Peak3_amp = fit_param[0][-2]
+
+    ax.invert_xaxis()
+    ax.legend()
+    ax.set_xlabel('Wavenumber')
+    ax.set_ylabel('Absorbance')
+    return ax
+
+
+# %%
+# Function to fit the baselines: 
+# uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
+
+Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
+
+def Carbonate_baseline_fit(Spec, Average_baseline, PCA_vectors, n_PCA_vectors=2, Peak1=Peak1, Peak2=Peak2, Peak3=Peak3):
 
     PCA_DF = pd.DataFrame(PCA_vectors[0:n_PCA_vectors].T, index=Wavenumber)
     
@@ -230,10 +324,10 @@ def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak
     tilt = pd.Series(np.arange(0, len(Peak2)), index=Wavenumber)
 
     
-    Baseline_Matrix = pd.concat([PCA_DF, offset, tilt, Peak2, Peak3], axis=1)
+    #Baseline_Matrix = pd.concat([ Average_baseline, PCA_DF, offset, tilt, Peak2, Peak3], axis=1)
 
     # This line is only used if we are fitting the Water peak with the CO2 peak. 
-    #Baseline_Matrix = pd.concat([PCA_DF, offset, tilt, Peak2, Peak3, Peak1], axis=1)
+    Baseline_Matrix = pd.concat([Average_baseline, PCA_DF, offset, tilt, Peak2, Peak3, Peak1], axis=1)
 
     Baseline_Matrix = np.matrix(Baseline_Matrix)
 
@@ -246,7 +340,11 @@ def Carbonate_baseline_fit(Spec, PCA_vectors, n_PCA_vectors=4, Peak1=Peak1, Peak
 
 def plot_Baseline_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
     modeled_basline = np.matrix(
-        Baseline_Matrix[:, 0:-2])*fit_param[0][0:-2]  # Ignores the Peaks in fit.
+        Baseline_Matrix[:, 0:-3])*fit_param[0][0:-3]  # Ignores the Peaks in fit.
+
+    #modeled_basline = np.matrix(
+    #   Baseline_Matrix[:, 0:-2])*fit_param[0][0:-2]  # Ignores the Peaks in fit. Only for CO2 peaks
+
 
     fig, ax = plt.subplots(figsize=(12, 6))
     #plt.plot(Wavenumber,Spectrum.values, label = "Spectrum") for Pandas
@@ -284,7 +382,7 @@ Spectrum = open_spectrum(Sarah_path)
 sarahFTIR = StandardScaler(with_std=False).fit_transform(Spectrum)
 sarahFTIR = Spectrum
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spec=sarahFTIR, n_PCA_vectors=5, PCA_vectors=PCA_vectors)
+    Spec=sarahFTIR, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
 
 
 plot_Baseline_results(sarahFTIR, Baseline_Matrix=Baseline_Matrix,
