@@ -244,24 +244,26 @@ cbar.set_label(z.name)
 
 # %%
 # Make Dataframes without Water peak for improved to fit 
-def H2O_peak_cut(df, wn_cut_low, wn_cut_high):
-    No_Peaks_Frame = df.drop(df[1500:1800].index)
-    return No_Peaks_Frame
+def H2O_peak_cut(df, wn_cut_low, wn_cut_high, return_DF = False):
+    No_Peaks_Frame = df.drop(df[wn_cut_low:wn_cut_high].index)
 
-No_Peaks_Frame = H2O_frame_select.drop(H2O_frame_select[1500:1800].index)
-No_Peaks_Wn = No_Peaks_Frame.index
-No_Peaks_Data = No_Peaks_Frame.values
+    if return_DF == True:
+        return No_Peaks_Frame
+    
+    No_Peaks_Wn = No_Peaks_Frame.index
+    No_Peaks_Data = No_Peaks_Frame.values
+    return  No_Peaks_Wn, No_Peaks_Data
 
+# %%
+wn_cut_low, wn_cut_high = (1500, 1800)
 
-PCA_DF = pd.DataFrame(PCA_vectors[0:2], index = Wavenumber)
+Full_No_Peaks_Wn, Full_No_Peaks_Values = H2O_peak_cut(H2O_frame_select, wn_cut_low, wn_cut_high)
 
+H2O_free_PCA_DF = pd.DataFrame(PCA_vectors[0:2].T, index = Wavenumber)
+PCA_No_Peaks_DF = H2O_peak_cut(H2O_free_PCA_DF, wn_cut_low, wn_cut_high, return_DF=True)
 
 Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
-Avg_BSL_no_peaks = Average_baseline.drop(Average_baseline)
-
-
-# Next do the same thing for the PCA components. Remove the area between the peaks and then use that as an input for the Least Squares
-# Then replace all the H2O data with the PCA fits and save all the baseline subtracted peak shapes 
+Avg_BSL_no_peaks = H2O_peak_cut(Average_baseline, wn_cut_low, wn_cut_high, return_DF=True)
 
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
@@ -274,12 +276,10 @@ Peak3 = pd.Series(Gauss(x=Wavenumber, mu=1515, sd=30, A=1), index=Wavenumber)
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
 
 
-def No_H2O_fit(Spec, Average_baseline, PCA_vectors, n_PCA_vectors=2, Wavenumber = Wavenumber):
-
-    PCA_DF = pd.DataFrame(PCA_vectors[0:n_PCA_vectors].T, index=Wavenumber)
+def No_H2O_fit(Spec, Average_baseline, PCA_DF, Wavenumber = Wavenumber): 
     
-    offset = pd.Series(np.ones(len(Peak2)), index= Wavenumber)
-    tilt = pd.Series(np.arange(0, len(Peak2)), index=Wavenumber)
+    offset = pd.Series(np.ones(len(Average_baseline)), index= Wavenumber)
+    tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
     
     Baseline_Matrix = pd.concat([Average_baseline, PCA_DF, offset, tilt,], axis=1)
 
@@ -296,8 +296,7 @@ def plot_NoH2O_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
     #plt.plot(Wavenumber,Spectrum.values, label = "Spectrum") for Pandas
     plt.plot(Wavenumber, Spectrum, label="Spectrum")
 
-    plt.plot(Wavenumber,np.matrix(Baseline_Matrix)*fit_param[0], label = 'Modeled Fit')
-    plt.plot(Wavenumber,modeled_basline, label='Baseline')
+    plt.plot(Wavenumber,np.matrix(Baseline_Matrix)*np.matrix(fit_param[0]).T, label = 'Modeled Fit')
 
     #Peak1_amp = fit_param[0][-1]
     #Peak2_amp = fit_param[0][-3]
@@ -308,6 +307,22 @@ def plot_NoH2O_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
     ax.set_xlabel('Wavenumber')
     ax.set_ylabel('Absorbance')
     return ax
+
+# %%
+
+#This line subtracts the mean from your data
+Test_Spectrum = Full_No_Peaks_Values[:,0]
+Baseline_Matrix, fit_param1 = No_H2O_fit(
+    Spec=Test_Spectrum, Average_baseline=Avg_BSL_no_peaks, PCA_DF=PCA_No_Peaks_DF,
+    Wavenumber = Avg_BSL_no_peaks_Wn)
+
+#%%
+
+plot_NoH2O_results(Test_Spectrum , Baseline_Matrix=Baseline_Matrix,
+                      fit_param=fit_param1, Wavenumber=Avg_BSL_no_peaks_Wn)
+
+
+
 
 
 # %%
