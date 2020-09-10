@@ -103,7 +103,7 @@ Data, Mean_baseline = scale_data(Data_init, Wavenumber)
 
 # %%
 def savgol_filter(x):
-    return signal.savgol_filter(x, 101, 3)
+    return signal.savgol_filter(x, 151, 3)
 
 Smoothed= np.apply_along_axis(savgol_filter,0,Data)
 
@@ -122,7 +122,7 @@ ax.invert_xaxis()
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
 #%%
-Data = Smoothed
+#Data = Smoothed
 # %%
 # Calculates the Principle components
 pca = PCA(4, ) # Number of PCA vectors to calculate 
@@ -265,6 +265,8 @@ PCA_No_Peaks_DF = H2O_peak_cut(H2O_free_PCA_DF, wn_cut_low, wn_cut_high, return_
 Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
 Avg_BSL_no_peaks = H2O_peak_cut(Average_baseline, wn_cut_low, wn_cut_high, return_DF=True)
 
+tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
+tilt_cut = H2O_peak_cut(tilt, wn_cut_low, wn_cut_high, return_DF=True)
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
 Peak1 = pd.Series( Lorentzian(x=Wavenumber, center=1635, half_width=55, amp=1),index=Wavenumber)
@@ -276,10 +278,10 @@ Peak3 = pd.Series(Gauss(x=Wavenumber, mu=1515, sd=30, A=1), index=Wavenumber)
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
 
 
-def No_H2O_fit(Spec, Average_baseline, PCA_DF, Wavenumber = Wavenumber): 
+def No_H2O_fit(Spec, Average_baseline, PCA_DF,  tilt, Wavenumber = Wavenumber): 
     
     offset = pd.Series(np.ones(len(Average_baseline)), index= Wavenumber)
-    tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
+    #tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
     
     Baseline_Matrix = pd.concat([Average_baseline, PCA_DF, offset, tilt,], axis=1)
 
@@ -309,23 +311,68 @@ def plot_NoH2O_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
     return ax
 
 # %%
+def tilt_fit(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
 
-#This line subtracts the mean from your data
-Test_Spectrum = Full_No_Peaks_Values[:,0]
-Baseline_Matrix, fit_param1 = No_H2O_fit(
-    Spec=Test_Spectrum, Average_baseline=Avg_BSL_no_peaks, PCA_DF=PCA_No_Peaks_DF,
-    Wavenumber = Avg_BSL_no_peaks_Wn)
-
-#%%
-
-plot_NoH2O_results(Test_Spectrum , Baseline_Matrix=Baseline_Matrix,
-                      fit_param=fit_param1, Wavenumber=Avg_BSL_no_peaks_Wn)
+    offset = pd.Series(np.ones(len(Wavenumber)), index= Wavenumber)
+    tilt = pd.Series(np.arange(0, len(Wavenumber)), index=Wavenumber)
 
 
+    Tilt_Matrix = pd.concat([offset, tilt], axis=1)
 
+    Tilt_Matrix = np.matrix(Tilt_Matrix)
 
+    fit_param = np.linalg.lstsq(Tilt_Matrix, Spec)  
 
 # %%
+#This line subtracts the mean from your data
+
+Test_Spectrum = Full_No_Peaks_Values[:,9]
+Baseline_Matrix, fit_param1 = No_H2O_fit(
+    Spec=Test_Spectrum, Average_baseline=Avg_BSL_no_peaks, PCA_DF=PCA_No_Peaks_DF,
+    Wavenumber = Avg_BSL_no_peaks_Wn, tilt = tilt_cut)
+
+
+
+plot_NoH2O_results(Test_Spectrum , Baseline_Matrix=Baseline_Matrix,
+                    fit_param=fit_param1, Wavenumber=Avg_BSL_no_peaks_Wn)
+
+# %% Baseline Matrix without peaks removed
+Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
+
+Full_Baseline_Matrix, fit_param = Carbonate_baseline_fit(
+    Spec=Data[:,0] , Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+Full_Baseline_Matrix= Full_Baseline_Matrix[:, 0:-3]
+#%%
+# make list of all fit parameters to use to replace data. 
+Fits = []
+No_H2O_baseline = []
+ 
+
+for spec in Full_No_Peaks_Values.T:
+    Baseline_Matrix, fit_param = No_H2O_fit(
+    Spec=spec, Average_baseline=Avg_BSL_no_peaks, PCA_DF=PCA_No_Peaks_DF,
+    Wavenumber = Avg_BSL_no_peaks_Wn, tilt = tilt_cut)
+
+    Fits.append(fit_param)
+
+    base_full = Full_Baseline_Matrix*np.matrix(fit_param[0]).T
+    No_H2O_baseline.append(base_full)
+
+# %%
+
+spec_idx = 20
+
+fig, ax = plt.subplots(figsize = (12,6))
+plt.plot(Wavenumber, No_H2O_baseline[spec_idx])
+plt.plot(Wavenumber, H2O_Data_init[:,spec_idx] )
+
+plt.legend()
+ax.invert_xaxis()
+ax.legend()
+ax.set_xlabel('Wavenumber')
+ax.set_ylabel('Absorbance')
+ # %%
 # Function to fit the baselines: 
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
 
