@@ -1,6 +1,8 @@
 # %%
+from PIL.Image import merge
 from matplotlib import pyplot as plt
 import numpy as np
+from numpy.core.fromnumeric import sort
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, normalize
 from sklearn.decomposition import PCA
@@ -103,7 +105,7 @@ Data, Mean_baseline = scale_data(Data_init, Wavenumber)
 
 # %%
 def savgol_filter(x):
-    return signal.savgol_filter(x, 151, 3)
+    return signal.savgol_filter(x, 101, 3)
 
 Smoothed= np.apply_along_axis(savgol_filter,0,Data)
 
@@ -155,12 +157,14 @@ plt.plot(Wavenumber, PCA_vectors[2], label="PCA:3")
 #plt.plot(Wavenumber, PCA_vectors[5], label="PCA:6")
 #plt.plot(Wavenumber, PCA_vectors[6], label="PCA:7")
 #plt.plot(Wavenumber, PCA_vectors[7], label="PCA:8")
+
 plt.legend()
 ax.invert_xaxis()
 ax.legend()
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
 plt.savefig('component_plot.png')
+
 
 #%%
 fig, ax = plt.subplots(figsize=(8,8))
@@ -255,7 +259,7 @@ def H2O_peak_cut(df, wn_cut_low, wn_cut_high, return_DF = False):
     return  No_Peaks_Wn, No_Peaks_Data
 
 # %%
-wn_cut_low, wn_cut_high = (1500, 1800)
+wn_cut_low, wn_cut_high = (1550, 1750)
 
 Full_No_Peaks_Wn, Full_No_Peaks_Values = H2O_peak_cut(H2O_frame_select, wn_cut_low, wn_cut_high)
 
@@ -264,9 +268,11 @@ PCA_No_Peaks_DF = H2O_peak_cut(H2O_free_PCA_DF, wn_cut_low, wn_cut_high, return_
 
 Average_baseline= pd.Series( Mean_baseline, index= Wavenumber)
 Avg_BSL_no_peaks = H2O_peak_cut(Average_baseline, wn_cut_low, wn_cut_high, return_DF=True)
+Avg_BSL_no_peaks_Wn = Avg_BSL_no_peaks.index
 
 tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
 tilt_cut = H2O_peak_cut(tilt, wn_cut_low, wn_cut_high, return_DF=True)
+
 # %%
 # Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
 Peak1 = pd.Series( Lorentzian(x=Wavenumber, center=1635, half_width=55, amp=1),index=Wavenumber)
@@ -326,7 +332,7 @@ def tilt_fit(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
 # %%
 #This line subtracts the mean from your data
 
-Test_Spectrum = Full_No_Peaks_Values[:,9]
+Test_Spectrum = Full_No_Peaks_Values[:,19]
 Baseline_Matrix, fit_param1 = No_H2O_fit(
     Spec=Test_Spectrum, Average_baseline=Avg_BSL_no_peaks, PCA_DF=PCA_No_Peaks_DF,
     Wavenumber = Avg_BSL_no_peaks_Wn, tilt = tilt_cut)
@@ -361,17 +367,61 @@ for spec in Full_No_Peaks_Values.T:
 
 # %%
 
-spec_idx = 20
+spec_idx = 5
 
 fig, ax = plt.subplots(figsize = (12,6))
-plt.plot(Wavenumber, No_H2O_baseline[spec_idx])
-plt.plot(Wavenumber, H2O_Data_init[:,spec_idx] )
+plt.plot(Wavenumber, No_H2O_baseline[spec_idx], label= "No Water Baseline")
+plt.plot(Wavenumber, H2O_Data_init[:,spec_idx], label= "Spectrum" )
 
 plt.legend()
 ax.invert_xaxis()
 ax.legend()
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
+
+# %%
+
+No_H2O_baseline_df = pd.DataFrame(np.array(No_H2O_baseline)[:,:,0].T, index = Wavenumber[0], columns= H2O_frame_select.columns)
+
+H2O_Peaks = H2O_frame_select - No_H2O_baseline_df
+
+cutout = No_H2O_baseline_df[1500:1800]
+
+smooth_cutout = np.apply_along_axis(savgol_filter,0,cutout)
+
+smooth_cutout_df = pd.DataFrame(smooth_cutout, index =cutout.index, columns= cutout.columns)
+
+fig, ax = plt.subplots(figsize=(12,6))
+plt.plot(cutout.index, smooth_cutout)
+plt.plot(cutout)
+#%%
+offset_1500 = H2O_frame_select.loc[1500:1501] - smooth_cutout_df.loc[1500:1501]
+
+offset_1800 = H2O_frame_select.loc[1799:1800] - smooth_cutout_df.loc[1799:1800]
+
+slope = (offset_1800.values - offset_1500.values)/ (1800-1500)
+cutout_tilt = np.tile(np.arange(0, len(cutout.index)),(len(cutout.columns),1))
+stitch_adjust = pd.DataFrame(np.multiply(slope, cutout_tilt.T ) + offset_1500.values, index = cutout.index, columns = cutout.columns)
+
+cut_adjusted = smooth_cutout_df + stitch_adjust
+
+Peaks_removed_full_DF = H2O_frame_select.drop(H2O_frame_select.loc[1500:1800].index).append(cut_adjusted,)
+Peaks_removed_full_DF.sort_index(inplace=True)
+
+#%%
+
+def savgol_filter_short(x):
+    return signal.savgol_filter(x, 51, 3)
+
+Peaks_removed_full = Peaks_removed_full_DF.apply( func = signal.savgol_filter, args = (31,3))
+Peaks_removed_full = pd.DataFrame(Peaks_removed_full, index = Peaks_removed_full_DF.index, columns = Peaks_removed_full_DF.columns) 
+Data_init = Peaks_removed_full.values
+
+# In order to stitch I need to have the yint from offset_1500 and add 
+#gh = cutout_tilt * slope + smooth_cutout
+#Data = H2O_Peaks.values
+
+#%%
  # %%
 # Function to fit the baselines: 
 # uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
