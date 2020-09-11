@@ -124,7 +124,7 @@ ax.invert_xaxis()
 ax.set_xlabel('Wavenumber')
 ax.set_ylabel('Absorbance')
 #%%
-#Data = Smoothed
+Data = Smoothed
 # %%
 # Calculates the Principle components
 pca = PCA(4, ) # Number of PCA vectors to calculate 
@@ -203,7 +203,8 @@ ax.set_ylabel('Absorbance')
 plt.savefig('PCA1_plot.png')
 
 # %%
-columns = ["PCA "+ str(x) for x in range(1,11)]
+# This needs to be rewritten to work with water removed peaks
+columns = ["PCA "+ str(x) for x in range(1,4)]
 PCA_reduced_data_df = pd.DataFrame(reduced_data, index = frame.columns,columns=columns )
 
 chem_data_path = '/Users/henry/Python Files/Basalt Carbonate Baselines/Dans_Baselinefiles/Databasefiles/mi_data_select.csv'
@@ -259,7 +260,7 @@ def H2O_peak_cut(df, wn_cut_low, wn_cut_high, return_DF = False):
     return  No_Peaks_Wn, No_Peaks_Data
 
 # %%
-wn_cut_low, wn_cut_high = (1550, 1750)
+wn_cut_low, wn_cut_high = (1500, 1800)
 
 Full_No_Peaks_Wn, Full_No_Peaks_Values = H2O_peak_cut(H2O_frame_select, wn_cut_low, wn_cut_high)
 
@@ -367,7 +368,7 @@ for spec in Full_No_Peaks_Values.T:
 
 # %%
 
-spec_idx = 5
+spec_idx = 10
 
 fig, ax = plt.subplots(figsize = (12,6))
 plt.plot(Wavenumber, No_H2O_baseline[spec_idx], label= "No Water Baseline")
@@ -381,11 +382,11 @@ ax.set_ylabel('Absorbance')
 
 # %%
 
-No_H2O_baseline_df = pd.DataFrame(np.array(No_H2O_baseline)[:,:,0].T, index = Wavenumber[0], columns= H2O_frame_select.columns)
+No_H2O_baseline_df = pd.DataFrame(np.array(No_H2O_baseline)[:,:,0].T, index = Wavenumber, columns= H2O_frame_select.columns)
 
 H2O_Peaks = H2O_frame_select - No_H2O_baseline_df
 
-cutout = No_H2O_baseline_df[1500:1800]
+cutout = No_H2O_baseline_df[wn_cut_low:wn_cut_high]
 
 smooth_cutout = np.apply_along_axis(savgol_filter,0,cutout)
 
@@ -395,19 +396,31 @@ fig, ax = plt.subplots(figsize=(12,6))
 plt.plot(cutout.index, smooth_cutout)
 plt.plot(cutout)
 #%%
-offset_1500 = H2O_frame_select.loc[1500:1501] - smooth_cutout_df.loc[1500:1501]
+offset_1500 = H2O_frame_select.loc[wn_cut_low:wn_cut_low+1] - smooth_cutout_df.loc[wn_cut_low:wn_cut_low+1]
 
-offset_1800 = H2O_frame_select.loc[1799:1800] - smooth_cutout_df.loc[1799:1800]
+offset_1800 = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high] - smooth_cutout_df.loc[wn_cut_high-1:wn_cut_high]
 
-slope = (offset_1800.values - offset_1500.values)/ (1800-1500)
-cutout_tilt = np.tile(np.arange(0, len(cutout.index)),(len(cutout.columns),1))
+slope = (offset_1800.values - offset_1500.values)/ (wn_cut_high-wn_cut_low)
+cutout_tilt = np.tile(np.arange(0, len(cutout.index)) - len(cutout.index)/2,(len(cutout.columns),1))
+
 stitch_adjust = pd.DataFrame(np.multiply(slope, cutout_tilt.T ) + offset_1500.values, index = cutout.index, columns = cutout.columns)
 
 cut_adjusted = smooth_cutout_df + stitch_adjust
 
-Peaks_removed_full_DF = H2O_frame_select.drop(H2O_frame_select.loc[1500:1800].index).append(cut_adjusted,)
-Peaks_removed_full_DF.sort_index(inplace=True)
+offset_1500_2 = H2O_frame_select.loc[wn_cut_low:wn_cut_low+1] - cut_adjusted.loc[wn_cut_low:wn_cut_low+1]
 
+offset_1800_2 = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high] - cut_adjusted.loc[wn_cut_high-1:wn_cut_high]
+
+
+
+fig, ax = plt.subplots(figsize = (12,6))
+#plt.plot(cut_adjusted)
+plt.plot(stitch_adjust)
+
+#%%
+Peaks_removed_full_DF = H2O_frame_select.drop(H2O_frame_select.loc[wn_cut_low:wn_cut_high].index).append(cut_adjusted,)
+Peaks_removed_full_DF.sort_index(inplace=True)
+plt.plot(Peaks_removed_full_DF)
 #%%
 
 def savgol_filter_short(x):
@@ -417,6 +430,16 @@ Peaks_removed_full = Peaks_removed_full_DF.apply( func = signal.savgol_filter, a
 Peaks_removed_full = pd.DataFrame(Peaks_removed_full, index = Peaks_removed_full_DF.index, columns = Peaks_removed_full_DF.columns) 
 Data_init = Peaks_removed_full.values
 
+#%%
+fig, ax = plt.subplots(figsize = (12,6))
+plt.plot(Peaks_removed_full_DF, marker='o', markersize= 3, linestyle=None)
+ax.set_xlim(1750, 1850)
+ax.set_ylim(0.3,0.5)
+
+fig, ax = plt.subplots(figsize = (12,6))
+plt.plot(Peaks_removed_full_DF, marker='o', markersize= 1, linestyle=None)
+ax.set_xlim(1450, 1550)
+ax.set_ylim(0.3,0.5)
 # In order to stitch I need to have the yint from offset_1500 and add 
 #gh = cutout_tilt * slope + smooth_cutout
 #Data = H2O_Peaks.values
