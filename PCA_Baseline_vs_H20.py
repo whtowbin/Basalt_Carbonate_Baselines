@@ -127,7 +127,7 @@ ax.set_ylabel('Absorbance')
 Data = Smoothed
 # %%
 # Calculates the Principle components
-pca = PCA(4, ) # Number of PCA vectors to calculate 
+pca = PCA(20, ) # Number of PCA vectors to calculate 
 
 principalComponents = pca.fit(Data.T) #everything appears to work best with the raw data or raw data scaled
 
@@ -191,8 +191,8 @@ plt.savefig('PCA1_plot.png')
 fig, ax = plt.subplots(figsize=(12,6))
 
 plt.plot(Wavenumber, Mean_baseline, label = 'Average Baseline', linewidth=3)
-plt.plot(Wavenumber, Mean_baseline+PCA_vectors[1]*1, label = 'Average Baseline + PCA2')
-plt.plot(Wavenumber, Mean_baseline-PCA_vectors[1]*1, label = 'Average Baseline - PCA2')
+plt.plot(Wavenumber, Mean_baseline+PCA_vectors[2]*1, label = 'Average Baseline + PCA2')
+plt.plot(Wavenumber, Mean_baseline-PCA_vectors[2]*1, label = 'Average Baseline - PCA2')
 #plt.plot(Mean_baseline-PCA_vectors[1]*2, label = 'Average Baseline + PCA2 *2')
 
 plt.legend()
@@ -396,26 +396,31 @@ fig, ax = plt.subplots(figsize=(12,6))
 plt.plot(cutout.index, smooth_cutout)
 plt.plot(cutout)
 #%%
-offset_1500 = H2O_frame_select.loc[wn_cut_low:wn_cut_low+1] - smooth_cutout_df.loc[wn_cut_low:wn_cut_low+1]
-
-offset_1800 = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high] - smooth_cutout_df.loc[wn_cut_high-1:wn_cut_high]
-
-slope = (offset_1800.values - offset_1500.values)/ (wn_cut_high-wn_cut_low)
-cutout_tilt = np.tile(np.arange(0, len(cutout.index)) - len(cutout.index)/2,(len(cutout.columns),1))
-
-stitch_adjust = pd.DataFrame(np.multiply(slope, cutout_tilt.T ) + offset_1500.values, index = cutout.index, columns = cutout.columns)
-
-cut_adjusted = smooth_cutout_df + stitch_adjust
-
-offset_1500_2 = H2O_frame_select.loc[wn_cut_low:wn_cut_low+1] - cut_adjusted.loc[wn_cut_low:wn_cut_low+1]
-
-offset_1800_2 = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high] - cut_adjusted.loc[wn_cut_high-1:wn_cut_high]
 
 
+offset_H2O_frame = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high].values - H2O_frame_select.loc[wn_cut_low:wn_cut_low+1].values 
+
+offset_smooth_cutout =  smooth_cutout_df.loc[wn_cut_high-1:wn_cut_high].values  - smooth_cutout_df.loc[wn_cut_low:wn_cut_low+1].values 
+
+Scaled_data_cut = smooth_cutout_df* (offset_H2O_frame/ offset_smooth_cutout)
+
+offset_1500 = H2O_frame_select.loc[wn_cut_low:wn_cut_low+1].values - Scaled_data_cut.loc[wn_cut_low:wn_cut_low+1].values
+
+offset_1800 = H2O_frame_select.loc[wn_cut_high-1:wn_cut_high].values - Scaled_data_cut.loc[wn_cut_high-1:wn_cut_high].values
+
+#slope = (offset_1800.values - offset_1500.values)/ (wn_cut_high-wn_cut_low)
+#cutout_tilt = np.tile(np.arange(0, len(cutout.index)) - len(cutout.index)/2,(len(cutout.columns),1))
+
+#stitch_adjust = pd.DataFrame(np.multiply(slope, cutout_tilt.T ) + offset_1500.values, index = cutout.index, columns = cutout.columns)
+
+#cut_adjusted = smooth_cutout_df + stitch_adjust
+cut_adjusted = Scaled_data_cut +offset_1800
+
+# I need to stretch not tilt!!!
 
 fig, ax = plt.subplots(figsize = (12,6))
 #plt.plot(cut_adjusted)
-plt.plot(stitch_adjust)
+plt.plot(cut_adjusted)
 
 #%%
 Peaks_removed_full_DF = H2O_frame_select.drop(H2O_frame_select.loc[wn_cut_low:wn_cut_high].index).append(cut_adjusted,)
