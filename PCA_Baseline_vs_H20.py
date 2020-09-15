@@ -29,15 +29,16 @@ Path_Scaled_cleaned2 = 'Dans_Data_scaled_cleaned2.csv'
 Path_Raw_cleaned2 = 'Dans_Data_raw_cleaned2.csv' 
 # From my experience this is the best maybe we can figureout how to remove the water in this. 
 
+NoH2O_rough= 'NoH2O_rough.csv'
 # This is where I select which database is used to make the baselines.
-DB_Name = NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
+DB_Name = NoH2O_rough #NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
 DB_Path = Path.cwd().joinpath(DB_Name)
 df_cleaned = pd.read_csv(DB_Path, index_col='Wavenumber')
 frame=df_cleaned
 Wavenumber = df_cleaned.index
 
 # %%
-H2O_DB_Name = original_cleaned 
+H2O_DB_Name = Path_Raw_cleaned2 #original_cleaned
 H2O_DB_Path = Path.cwd().joinpath(H2O_DB_Name)
 H2O_df_cleaned = pd.read_csv(H2O_DB_Path, index_col='Wavenumber')
 H2O_frame=H2O_df_cleaned
@@ -83,6 +84,47 @@ Mean_baseline= Data.mean(axis=1)
 Data = Data - Data.mean(axis=0)
 Data = Data - np.array([Mean_baseline]).T
 """
+
+
+# %%
+def savgol_filter(x, smooth_width, poly_order):
+    return signal.savgol_filter(x, smooth_width, poly_order)
+
+#Smoothed= np.apply_along_axis(savgol_filter,0,Data, smooth_width= 101, poly_order= 3)
+
+section_idx = np.where(np.round(Wavenumber) == 1500)[0][0]
+Smooth_section1 = np.apply_along_axis(savgol_filter,0,Data_init[ 0:section_idx + 50, :], smooth_width= 51, poly_order= 3)
+Smooth_section2 = np.apply_along_axis(savgol_filter,0,Data_init[ section_idx-50 :None, :], smooth_width= 301, poly_order= 3)
+
+#%%
+section_1 = Smooth_section1[0:-50, :]
+section_2 = Smooth_section2[50:None, :]
+
+offset_sections = section_1[-1] - section_2[0]
+section_1  = section_1 - offset_sections
+
+Smoothed = np.concatenate( [section_1, section_2], axis = 0)
+
+#%%
+fig, ax = plt.subplots(figsize=(12, 6))
+plt.plot(Wavenumber,Smoothed)
+ax.invert_xaxis()
+
+# Consider breaking up the spectra into overlapping segments and fitting. That way the overlapping regions wont cause a sharp transition when stitched. 
+
+# %%
+# Plots the database
+fig, ax = plt.subplots(figsize=(12, 6))
+plt.plot(Wavenumber, Data)
+plt.plot(Wavenumber, Smoothed)
+ax.invert_xaxis()
+
+ax.set_xlabel('Wavenumber')
+ax.set_ylabel('Absorbance')
+#%%
+Data_start = Smoothed
+
+
 # %%
 #Normalize Data for scaling 
 def scale_data(Data, Wavenumber):
@@ -98,36 +140,13 @@ def scale_data(Data, Wavenumber):
     Data = Data - np.array([Mean_baseline]).T
     return Data, Mean_baseline
 
-Data, Mean_baseline = scale_data(Data_init, Wavenumber)
+Data, Mean_baseline = scale_data(Data_start, Wavenumber)
 
 #H2O_Data, H2O_Mean_baseline = scale_data(H2O_Data, Wavenumber)
 
-
-# %%
-def savgol_filter(x):
-    return signal.savgol_filter(x, 101, 3)
-
-Smoothed= np.apply_along_axis(savgol_filter,0,Data)
-
-fig, ax = plt.subplots(figsize=(12, 6))
-plt.plot(Wavenumber,Smoothed)
-ax.invert_xaxis()
-
-
-# %%
-# Plots the database
-fig, ax = plt.subplots(figsize=(12, 6))
-plt.plot(Wavenumber, Data)
-plt.plot(Wavenumber, Smoothed)
-ax.invert_xaxis()
-
-ax.set_xlabel('Wavenumber')
-ax.set_ylabel('Absorbance')
-#%%
-Data = Smoothed
 # %%
 # Calculates the Principle components
-pca = PCA(20, ) # Number of PCA vectors to calculate 
+pca = PCA(6, ) # Number of PCA vectors to calculate 
 
 principalComponents = pca.fit(Data.T) #everything appears to work best with the raw data or raw data scaled
 
@@ -388,9 +407,9 @@ H2O_Peaks = H2O_frame_select - No_H2O_baseline_df
 
 cutout = No_H2O_baseline_df[wn_cut_low:wn_cut_high]
 
-smooth_cutout = np.apply_along_axis(savgol_filter,0,cutout)
+#smooth_cutout = np.apply_along_axis(savgol_filter,0,cutout)
 
-smooth_cutout_df = pd.DataFrame(smooth_cutout, index =cutout.index, columns= cutout.columns)
+smooth_cutout_df = pd.DataFrame(cutout, index =cutout.index, columns= cutout.columns)
 
 fig, ax = plt.subplots(figsize=(12,6))
 plt.plot(cutout.index, smooth_cutout)
@@ -433,7 +452,7 @@ def savgol_filter_short(x):
 
 Peaks_removed_full = Peaks_removed_full_DF.apply( func = signal.savgol_filter, args = (31,3))
 Peaks_removed_full = pd.DataFrame(Peaks_removed_full, index = Peaks_removed_full_DF.index, columns = Peaks_removed_full_DF.columns) 
-Data_init = Peaks_removed_full.values
+Data_start = Peaks_removed_full.values
 
 #%%
 fig, ax = plt.subplots(figsize = (12,6))
@@ -554,7 +573,9 @@ Spectrum1 = Dan_FTIR_select.iloc[:, 0].values.reshape(
 Spectrum1 = StandardScaler(with_std=False).fit_transform(Spectrum1)
 
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum1, n_PCA_vectors=9, PCA_vectors=PCA_vectors)
+    Spec=Spectrum1, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+
 plot_Baseline_results(Spectrum1, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.title('CL05MI01.csv')
@@ -566,17 +587,23 @@ plt.savefig('CL05MI01_baselinefit.png')
 Spectrum2 = Dan_FTIR_select.iloc[:, 1].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
 #Spectrum2 = StandardScaler(with_std=False).fit_transform(Spectrum2)
-Baseline_Matrix1, fit_param1 = Carbonate_baseline_fit(
-    Spectrum2, n_PCA_vectors=5, PCA_vectors=PCA_vectors)
-plot_Baseline_results(Spectrum2, Baseline_Matrix=Baseline_Matrix1,
+
+Baseline_Matrix, fit_param = Carbonate_baseline_fit(
+    Spec=Spectrum2, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+   
+plot_Baseline_results(Spectrum2, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param1, Wavenumber=Wavenumber)
 plt.title('CL05MI02.csv')
 plt.savefig('CL05MI02_baselinefit.png')
 # %%
 Spectrum = Dan_FTIR_select.iloc[:, 2].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
+
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum, n_PCA_vectors=7, PCA_vectors=PCA_vectors)
+    Spec=Spectrum, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+
 plot_Baseline_results(Spectrum, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.title('CL05MI08.csv')
@@ -585,7 +612,9 @@ plt.savefig('CL05MI08_baselinefit.png')
 Spectrum = Dan_FTIR_select.iloc[:, 3].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum, n_PCA_vectors=7, PCA_vectors=PCA_vectors)
+    Spec=Spectrum, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+
 plot_Baseline_results(Spectrum, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.title('CV04MI03.csv')
@@ -594,7 +623,9 @@ plt.savefig('CV04MI03_baselinefit.png')
 Spectrum = Dan_FTIR_select.iloc[:, 4].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum, n_PCA_vectors=7, PCA_vectors=PCA_vectors)
+    Spec=Spectrum, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+
 plot_Baseline_results(Spectrum, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.title('FR02MI01.csv')
@@ -603,7 +634,9 @@ plt.savefig('FR02MI01_baselinefit_.png')
 Spectrum = Dan_FTIR_select.iloc[:, 5].values.reshape(
     len(Dan_FTIR_select.iloc[:, 0]), 1)
 Baseline_Matrix, fit_param = Carbonate_baseline_fit(
-    Spectrum, n_PCA_vectors=7, PCA_vectors=PCA_vectors)
+    Spec=Spectrum, Average_baseline=Average_baseline, n_PCA_vectors=2, PCA_vectors=PCA_vectors)
+
+
 plot_Baseline_results(Spectrum, Baseline_Matrix=Baseline_Matrix,
                       fit_param=fit_param, Wavenumber=Wavenumber)
 plt.savefig('FR04MI01_baselinefit.png')
