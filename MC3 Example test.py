@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-import mc3
+import mc3 
 
 
 def quad(p, x):

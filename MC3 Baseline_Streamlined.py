@@ -45,6 +45,9 @@ Wavenumber = np.array([PCA_DF.index])
 
 PCAmatrix = np.matrix(PCA_DF.to_numpy())
 x = Wavenumber
+
+Peak_1635_PCA = pd.read_csv("Water_Peak_1635.csv", index_col= "Wavenumber")
+Peak_1635_PCAmatrix = np.matrix(Peak_1635_PCA.to_numpy())
 # peak_G1430, std_G1430, G1430_amplitude, peak_G1515, std_G1515, G1515_amplitude, peak_L1635, width_L1635, L1635_amplitude, slope, offset = P[Nvectors:None]
 # %%
 
@@ -63,10 +66,7 @@ def linear2(x, tilt, offset):
     tilt = np.arange(0, max(x.shape)) * tilt 
     tilt_offset = tilt + offset 
     return tilt_offset
-# %%
-tilt_offset =linear2(x[0,:], 1, 0)
 
-lin_x = linear(x[0,:],1,0)
 # %%
 def carbonate(P, x, PCAmatrix, Nvectors=5): 
     
@@ -74,7 +74,8 @@ def carbonate(P, x, PCAmatrix, Nvectors=5):
 
     peak_G1430, std_G1430, G1430_amplitude, peak_G1515, std_G1515, G1515_amplitude, peak_L1635, width_L1635, L1635_amplitude, slope, offset = P[Nvectors:None]
 
-    L1635 = Lorentzian(x, center=peak_L1635, half_width=width_L1635, amp=L1635_amplitude)
+    #L1635 = Lorentzian(x, center=peak_L1635, half_width=width_L1635, amp=L1635_amplitude)
+    L1635 = Gauss(x, peak_L1635, width_L1635, A=L1635_amplitude) # Trying a Gaussian
     G1515 = Gauss(x, peak_G1515, std_G1515, A=G1515_amplitude)
     G1430 = Gauss(x, peak_G1430, std_G1430, A=G1430_amplitude)
 
@@ -84,7 +85,26 @@ def carbonate(P, x, PCAmatrix, Nvectors=5):
     model_data = baseline + linear_offset + G1515 + G1430 + L1635
 
     return np.array(model_data)[0,:]
+
+def carbonate_1635_Peak(P, x, PCAmatrix, Peak_1635_PCAmatrix,  Nvectors=5): 
     
+    PCA_Weights = np.array( [P[0:Nvectors]] )
+
+    Peak_Weights = np.array( [P[-4:None]] )
+
+    peak_G1430, std_G1430, G1430_amplitude, peak_G1515, std_G1515, G1515_amplitude, slope, offset = P[Nvectors:None]
+
+    Peak_1635 = Peak_1635_PCAmatrix * Peak_Weights.T 
+    
+    G1515 = Gauss(x, peak_G1515, std_G1515, A=G1515_amplitude)
+    G1430 = Gauss(x, peak_G1430, std_G1430, A=G1430_amplitude)
+
+    linear_offset = linear2(x,slope, offset) 
+
+    baseline =  PCA_Weights * PCAmatrix.T
+    model_data = baseline + linear_offset + G1515 + G1430 + L1635
+
+    return np.array(model_data)[0,:]
 
 # %%
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -99,11 +119,11 @@ indparams = [x, PCAmatrix, Nvectors]
 
 # Array of initial-guess values of fitting parameters:
 
-P =           [1.0, 0.1 , 0.5, 0.5, 0.001, 1430.0, 30, 0.1, 1515, 30, 0.1, 1635.0, 55.0, 0.5, 7e-5, 0.65 ]
+P =           [1.0, 0.1 , 0.5, 0.5, 0.001, 1430.0, 30, 0.1, 1515, 30, 0.1, 1635.0, 30.0, 0.5, 7e-5, 0.65 ]
 params = np.float64(np.array(P))
 # Lower and upper boundaries for the MCMC exploration:
-pmin = np.array([0.0, -10.0 , -5, -5, -5, 1425.0, 25, 0.001, 1510, 25, 0.01, 1630.0, 40.0, 0.01, 5e-10, 0.0 ])
-pmax = np.array([50.0, 10.0 ,  5,  5,  5, 1435.0, 35, 0.5,   1520, 40,  0.5, 1640.0, 70,  1.0,  5e-2, 2.0 ])
+pmin = np.array([0.0, -10.0 , -5, -5, -5, 1425.0, 25, 0.001, 1515, 25, 0.01, 1630.0, 15.0, 0.01, 5e-10, 0.0 ])
+pmax = np.array([50.0, 10.0 ,  5,  5,  5, 1435.0, 45, 0.5,   1535, 45,  0.5, 1640.0, 70,  1.0,  5e-2, 2.0 ])
 
 
 # Parameters' stepping behavior:
@@ -162,7 +182,7 @@ wlike = False
 mc3_output = mc3.sample(data=data, uncert=uncert, func=func, params=params,
      indparams=indparams, pstep=pstep, 
      pmin=pmin, pmax=pmax,
-     priorlow=priorlow, priorup=priorup, 
+     #priorlow=priorlow, priorup=priorup, 
      pnames=pnames, texnames=texnames,
      sampler=sampler, nsamples=nsamples,  nchains=nchains,
      ncpu=ncpu, burnin=burnin, thinning=thinning,
