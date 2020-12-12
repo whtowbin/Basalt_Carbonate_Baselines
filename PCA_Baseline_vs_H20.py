@@ -230,17 +230,25 @@ plt.savefig("component_plot.png")
 
 # %%
 # Save PCA database with removed 1630 water peak
-"""
-Mean_base = pd.Series(Mean_baseline, index = Wavenumber, name = 'Average_Baseline')
-Baseline_DF = pd.DataFrame(PCA_vectors[0:4].T, index = Wavenumber, columns = ('PCA_1','PCA_2','PCA_3','PCA_4'))
-Baseline_Database = pd.concat([Mean_base, Baseline_DF], axis = 1)
-Baseline_Database.to_csv("Devol_Baseline_Avg+PCA.csv")
-"""
+
+# Mean_base = pd.Series(Mean_baseline, index = Wavenumber, name = 'Average_Baseline')
+# Baseline_DF = pd.DataFrame(PCA_vectors[0:4].T, index = Wavenumber, columns = ('PCA_1','PCA_2','PCA_3','PCA_4'))
+# Baseline_Database = pd.concat([Mean_base, Baseline_DF], axis = 1)
+# Baseline_Database.to_csv("Devol_Baseline_Avg+PCA.csv")
+# Baseline_Database.to_csv("Smoothed_Baselines_H2O_Free_Avg+PCA.csv")
+
+
 #%%
+# Plots the baseline database in terms of PCA component.
 fig, ax = plt.subplots(figsize=(8, 8))
 plt.scatter(reduced_data[:, 0], reduced_data[:, 1])
 ax.set_xlabel("PCA 1")
 ax.set_ylabel("PCA 2")
+
+#%%
+# PCA vector ranges
+PCA_max_Prior = reduced_data.max(axis=0)
+PCA_min_Prior = reduced_data.min(axis=0)
 # %%
 
 fig, ax = plt.subplots(figsize=(12, 6))
@@ -670,6 +678,7 @@ Peaks_removed_full_DF = H2O_frame_select.drop(
 Peaks_removed_full_DF.sort_index(inplace=True)
 plt.plot(Peaks_removed_full_DF)
 #%%
+# Devol Baselines saved
 
 
 def savgol_filter_short(x):
@@ -909,8 +918,16 @@ def plot_peak_results(Spectrum, Peak_Matrix, fit_param, Wavenumber):
 # %%
 n_PCA_vectors = 4
 spec = Good_peaks.values.T[38]
-Peak_Matrix, fit_param = Water_Peak_fit(spec, PCA_vectors=Peak_comps_df_full)
-plot_peak_results(spec, Peak_Matrix, fit_param, Wavenumber_full)
+Peak_Matrix, fit_param = Water_Peak_fit(
+    spec,
+    PCA_vectors=Peak_comps_df_full,
+)
+plot_peak_results(
+    spec,
+    Peak_Matrix,
+    fit_param,
+    Wavenumber_full,
+)
 
 # %%
 
