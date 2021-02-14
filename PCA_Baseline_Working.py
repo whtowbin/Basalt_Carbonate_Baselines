@@ -1,5 +1,7 @@
 # %%
+from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 
+# %%
 from matplotlib import pyplot as plt
 %config InlineBackend.figure_format = 'retina'
 

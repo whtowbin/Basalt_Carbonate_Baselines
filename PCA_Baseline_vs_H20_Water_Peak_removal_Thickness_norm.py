@@ -23,14 +23,14 @@ thickness_norm_NoH2O = "Dan_Baseline_database_thickness_norm_water_free.xlsx"
 DB_Name = thickness_norm_NoH2O  # NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
 
 DB_Path = Path.cwd().joinpath(DB_Name)
-df_cleaned = pd.read_excel(DB_Path, index_col="Wavenumber")
+df_cleaned = pd.read_excel(DB_Path, index_col="Wavenumber", engine="openpyxl")
 frame = df_cleaned
 Wavenumber = df_cleaned.index
 
 # %%
 H2O_DB_Name = Cleaned_spectra  # Path_Raw_cleaned2 #original_cleaned
 H2O_DB_Path = Path.cwd().joinpath(H2O_DB_Name)
-H2O_df_cleaned = pd.read_excel(H2O_DB_Path, index_col="Wavenumber")
+H2O_df_cleaned = pd.read_excel(H2O_DB_Path, index_col="Wavenumber", engine="openpyxl")
 H2O_frame = H2O_df_cleaned
 H2O_Wavenumber = H2O_df_cleaned.index
 
@@ -98,7 +98,7 @@ def interp_smooth(spectrum, Wavenumber=Wavenumber):
 
 section_idx = np.where(np.round(Wavenumber) == 1500)[0][0]
 Smooth_section1 = np.apply_along_axis(
-    savgol_filter, 0, Data_init[0 : section_idx + 50, :], smooth_width=71, poly_order=3
+    savgol_filter, 0, Data_init[0 : section_idx + 50, :], smooth_width=51, poly_order=3
 )
 diff = Smooth_section1 - Data_init[0 : section_idx + 50, :]
 Smooth_diff = np.apply_along_axis(
@@ -110,7 +110,7 @@ Smooth_section2 = np.apply_along_axis(
     savgol_filter,
     0,
     Data_init[section_idx - 50 : None, :],
-    smooth_width=121,
+    smooth_width=91,
     poly_order=3,
 )
 
@@ -145,7 +145,7 @@ ax.set_ylabel("Absorbance")
 
 #%%
 Data_start = Smoothed
-
+# ata_start = Data_init
 
 # %%
 
@@ -186,7 +186,7 @@ def data_offset(Data, Wavenumber, common_offset_wn=None):
 
 
 # Data, Mean_baseline = scale_data(Data_start, Wavenumber)
-Data, Mean_baseline = data_offset(Data_init, Wavenumber)
+Data, Mean_baseline = data_offset(Data_init, Wavenumber, common_offset_wn=2200)
 
 Data, Mean_baseline = data_offset(Data_start, Wavenumber, common_offset_wn=2200)
 # H2O_Data, H2O_Mean_baseline = scale_data(H2O_Data, Wavenumber)
@@ -240,12 +240,14 @@ plt.savefig("component_plot.png")
 # %%
 # Save PCA database with removed 1630 water peak
 
-# Mean_base = pd.Series(Mean_baseline, index = Wavenumber, name = 'Average_Baseline')
-# Baseline_DF = pd.DataFrame(PCA_vectors[0:4].T, index = Wavenumber, columns = ('PCA_1','PCA_2','PCA_3','PCA_4'))
-# Baseline_Database = pd.concat([Mean_base, Baseline_DF], axis = 1)
+Mean_base = pd.Series(Mean_baseline, index=Wavenumber, name="Average_Baseline")
+Baseline_DF = pd.DataFrame(
+    PCA_vectors[0:4].T, index=Wavenumber, columns=("PCA_1", "PCA_2", "PCA_3", "PCA_4")
+)
+Baseline_Database = pd.concat([Mean_base, Baseline_DF], axis=1)
 # Baseline_Database.to_csv("Devol_Baseline_Avg+PCA.csv")
 # Baseline_Database.to_csv("Smoothed_Baselines_H2O_Free_Avg+PCA.csv")
-
+Baseline_Database.to_csv("Thickness_normed_Water_free_Baseline_Avg+PCA.csv")
 
 #%%
 # Plots the baseline database in terms of PCA component.
@@ -386,7 +388,10 @@ cbar.set_label(z.name)
 # %%
 # Make Dataframes without Water peak for improved fit
 def H2O_peak_cut(df, wn_cut_low, wn_cut_high, return_DF=False):
-
+    """
+    Returns baseline database without water peak.
+    Either a database or just the values.
+    """
     No_Peaks_Frame = df.drop(df[wn_cut_low:wn_cut_high].index)
 
     if return_DF == True:
@@ -416,76 +421,6 @@ Avg_BSL_no_peaks_Wn = Avg_BSL_no_peaks.index
 
 tilt = pd.Series(np.arange(0, len(Average_baseline)), index=Wavenumber)
 tilt_cut = H2O_peak_cut(tilt, wn_cut_low, wn_cut_high, return_DF=True)
-
-# %%
-# Synthetic Peaks Choose peak shape, position and width. In the future these will be fit parameters
-Peak1 = pd.Series(
-    Lorentzian(x=Wavenumber, center=1635, half_width=55, amp=1), index=Wavenumber
-)
-Peak2 = pd.Series(Gauss(x=Wavenumber, mu=1430, sd=30, A=1), index=Wavenumber)
-Peak3 = pd.Series(Gauss(x=Wavenumber, mu=1515, sd=30, A=1), index=Wavenumber)
-# %%
-# Function to fit the baselines:
-# uses the PCA components and the synthetic peaks to mad elinear combinations that fit the data. T
-
-
-def Carbonate_baseline_fit(
-    Spec,
-    Average_baseline,
-    PCA_vectors,
-    n_PCA_vectors=2,
-    Peak1=Peak1,
-    Peak2=Peak2,
-    Peak3=Peak3,
-):
-
-    PCA_DF = pd.DataFrame(PCA_vectors[0:n_PCA_vectors].T, index=Wavenumber)
-
-    offset = pd.Series(np.ones(len(Peak2)), index=Wavenumber)
-    tilt = pd.Series(np.arange(0, len(Peak2)), index=Wavenumber)
-
-    # Baseline_Matrix = pd.concat([ Average_baseline, PCA_DF, offset, tilt, Peak2, Peak3], axis=1)
-
-    # This line is only used if we are fitting the Water peak with the CO2 peak.
-    Baseline_Matrix = pd.concat(
-        [Average_baseline, PCA_DF, offset, tilt, Peak2, Peak3, Peak1], axis=1
-    )
-
-    Baseline_Matrix = np.matrix(Baseline_Matrix)
-
-    fit_param = np.linalg.lstsq(Baseline_Matrix, Spec)
-
-    return Baseline_Matrix, fit_param
-
-
-# %%
-# plots the results
-
-
-def plot_Baseline_results(Spectrum, Baseline_Matrix, fit_param, Wavenumber):
-    modeled_basline = (
-        np.matrix(Baseline_Matrix[:, 0:-3]) * fit_param[0][0:-3]
-    )  # Ignores the Peaks in fit.
-
-    # modeled_basline = np.matrix(
-    #   Baseline_Matrix[:, 0:-2])*fit_param[0][0:-2]  # Ignores the Peaks in fit. Only for CO2 peaks
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    # plt.plot(Wavenumber,Spectrum.values, label = "Spectrum") for Pandas
-    plt.plot(Wavenumber, Spectrum, label="Spectrum")
-
-    plt.plot(Wavenumber, np.matrix(Baseline_Matrix) * fit_param[0], label="Modeled Fit")
-    plt.plot(Wavenumber, modeled_basline, label="Baseline")
-
-    # Peak1_amp = fit_param[0][-1]
-    # Peak2_amp = fit_param[0][-3]
-    # Peak3_amp = fit_param[0][-2]
-
-    ax.invert_xaxis()
-    ax.legend()
-    ax.set_xlabel("Wavenumber")
-    ax.set_ylabel("Absorbance")
-    return ax
 
 
 # %%
