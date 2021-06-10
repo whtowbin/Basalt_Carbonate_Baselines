@@ -10,6 +10,24 @@ import glob
 from scipy import signal
 from scipy import interpolate
 from pathlib import Path
+#%%
+
+import scipy.sparse as sparse
+def baseline_als(y, lam, p, niter=10):
+    """
+    Asymmetric Least Squares Smoothing" by P. Eilers and H. Boelens in 2005 implemented on stackoverflow by user: sparrowcide
+    https://stackoverflow.com/questions/29156532/python-baseline-correction-library
+    """
+    L = len(y)
+    D = sparse.csc_matrix(np.diff(np.eye(L), 2))
+    w = np.ones(L)
+    for i in range(niter):
+        W = sparse.spdiags(w, 0, L, L)
+        #Z = W + lam * D.dot(D.transpose())
+        Z = W + lam * np.dot(D,D.T)
+        z = sparse.linalg.spsolve(Z, w*y)
+        w = p * (y > z) + (1-p) * (y < z)
+    return z
 
 # %%
 # This is a list of the baseline databases to choose from. We will probably change this as we go.
@@ -151,20 +169,38 @@ ax.invert_xaxis()
 
 # %%
 # Bad prob.: 9, 2, 22 , 5,8, 17 , 26
-# maybe 3, 5, 16
+# maybe 0, 3, 5, 16
 # 6 May have some Co2
 # Plots the database
 #new numbers: 6, maybe slight water peak, 12 is just noisy, 13 is bad
+
 idx = 0
-fig, ax = plt.subplots(figsize=(12, 6))
-plt.plot(Wavenumber, Data_init[:, idx])
-plt.plot(Wavenumber, Smoothed[:, idx])
-plt.plot((1635,1635), (0.1,0.6))
-ax.invert_xaxis()
+base = baseline_als(-Smooth_Data[30:None,idx], lam=1e2, p=1e-10, niter=20)
+plt.plot(Wavenumber,Data[:,idx])
+plt.plot(Wavenumber[30:None],-base)
+plt.plot(Wavenumber,Smooth_Data[:,idx])
+plt.plot((1635,1635), (-0.075,0.1))
+plt.plot((1275,1275), (-0.075,0.1))
+plt.plot((1515,1515), (-0.075,0.1))
+plt.plot((1430,1430), (-0.075,0.1))
+plt.ylim(-.1,.2)
 
-ax.set_xlabel("Wavenumber")
-ax.set_ylabel("Absorbance")
+# cut: 2 ,8 ,13
+# maybe 4, 6, 15
+# Remove residual water peak idx: 0, 3
 
+# 6,7,  might be oaky if smooted prior 
+#8, 9, 10 is fine for average,
+#13, 15 could smooth alright
+#Finalized
+# Good:1, 15, 16, 
+# Needs some smoothing 4
+#Baseline Smoothing Parameters 
+#idx 0: negative spec lam=1e5, p=5e-2
+#idx 3: negative spec lam=1e5, p=5e-2
+# idx 11: lam=5e5, p=3e-1, niter=20 
+# idx 12: lam=1e5, p=5e-2, 
+# idx 14: lam=1e5, p=5e-2
 #%%
 # maybe normalize by 1275
 # 0, 4bad,6  ,8?,12 , 13 is bad

@@ -37,7 +37,9 @@ H2O_Wavenumber = H2O_df_cleaned.index
 # %%
 # Defining the Peaks shapes
 def Lorentzian(x, center, half_width, amp=1):
-    L = amp * (half_width ** 2 / (half_width ** 2 + (2 * x - 2 * center) ** 2))
+    #L = amp * (half_width ** 2 / (half_width ** 2 + (2 * x - 2 * center) ** 2))
+        V = (x - center) / (half_width / 2)
+    L = amp * 1 / (1 + V ** 2)
     return L
 
 
@@ -59,7 +61,7 @@ def linear(x, m):
 
 # wn_high = 1500
 wn_low = 1250
-wn_high = 2400
+wn_high = 2200#2400
 
 # wn_low = 1800
 # wn_low = 1500
