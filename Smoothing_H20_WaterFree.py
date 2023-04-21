@@ -32,8 +32,9 @@ Path_Raw_cleaned2 = "Dans_Data_raw_cleaned2.csv"
 
 NoH2O_rough = "NoH2O_rough.csv"
 NoH2O_rough_select = "NoH2O_rough_select.csv"
+NoH2O_rough_select2 = "NoH2O_rough_select2.csv" # removes Newman Baseline which doenst go higher than 2400
 # This is where I select which database is used to make the baselines.
-DB_Name = NoH2O_rough_select  # NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
+DB_Name = NoH2O_rough_select2 # NoH2O_Path_smoothed #original #NoH2O_Path_smoothed #Path_Raw_cleaned2
 DB_Path = Path.cwd().joinpath(DB_Name)
 df_cleaned = pd.read_csv(DB_Path, index_col="Wavenumber")
 frame = df_cleaned
@@ -108,7 +109,7 @@ def scale_data(Data, Wavenumber):
 wn_low = 1275  # 1250
 wn_low_init = wn_low
 
-wn_high = 2200  # 2400
+wn_high = 2350 #2200  # 2400
 wn_high_init = wn_high
 
 # wn_low = 1800
@@ -150,7 +151,7 @@ def smoothing_protocol(Data_values, Wavenumber=Wavenumber):
         savgol_filter,
         0,
         Data_values[0 : section_idx + 50, :],
-        smooth_width=71,  # Filter smoothing width
+        smooth_width=91,  # Filter smoothing width
         poly_order=4,
     )
     diff = Smooth_section1 - Data_values[0 : section_idx + 50, :]
@@ -164,7 +165,7 @@ def smoothing_protocol(Data_values, Wavenumber=Wavenumber):
         savgol_filter,
         0,
         Data_values[section_idx - 50 : None, :],
-        smooth_width=121,  # 121
+        smooth_width=131,  # 121
         poly_order=4,
     )
 
@@ -199,11 +200,11 @@ Smoothed_DF = pd.DataFrame(Smoothed, index=Wavenumber_full.T)
 
 H2O_Data_smooth = smoothing_protocol(H2O_Data_init)
 #%%
-for idx, spec in enumerate(H2O_Data_smooth[0, :]):
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plt.plot(Wavenumber, H2O_Data_smooth[:, idx])
-    plt.plot(Wavenumber, H2O_Data_init[:, idx])
-    ax.invert_xaxis()
+# for idx, spec in enumerate(H2O_Data_smooth[0, :]):
+#     fig, ax = plt.subplots(figsize=(12, 6))
+#     plt.plot(Wavenumber, H2O_Data_smooth[:, idx])
+#     plt.plot(Wavenumber, H2O_Data_init[:, idx])
+#     ax.invert_xaxis()
 #%%
 
 Data_raw, Mean_baseline_raw = basic_scale_data(Data_init, Wavenumber)
@@ -278,31 +279,31 @@ Smooth_Data, Smooth_Mean_baseline = scale_data(Smoothed, Wavenumber)
 
 # Plotting all data  to make sure All CO2 Peaks are removed
 plt.close("all")
-H2O_Data_raw, H2O_Mean_baseline_raw = basic_scale_data(H2O_Data_init, Wavenumber)
-for idx in range(H2O_Data_raw.shape[1]):
+# H2O_Data_raw, H2O_Mean_baseline_raw = basic_scale_data(H2O_Data_init, Wavenumber)
+# for idx in range(H2O_Data_raw.shape[1]):
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plt.plot((1430, 1430), (-0.5, 0))
-    plt.plot((1515, 1515), (-0.5, 0))
-    plt.plot((1630, 1630), (-0.5, 0))
-    plt.plot(Wavenumber, H2O_Data_raw[:, idx])
+#     fig, ax = plt.subplots(figsize=(12, 6))
+#     plt.plot((1430, 1430), (-0.5, 0))
+#     plt.plot((1515, 1515), (-0.5, 0))
+#     plt.plot((1630, 1630), (-0.5, 0))
+#     plt.plot(Wavenumber, H2O_Data_raw[:, idx])
 
-    plt.title(f"idx:{idx}")
-    plt.ylim(-0.35, 0)
-    ax.invert_xaxis()
+#     plt.title(f"idx:{idx}")
+#     plt.ylim(-0.35, 0)
+#     ax.invert_xaxis()
 # Has CO2: 29,30,6, 23, 36,37
 # Maybe:2, 33, 47
 #%%
-idx = 35
-fig, ax = plt.subplots(figsize=(12, 6))
-plt.plot((1430, 1430), (-0.5, 0))
-plt.plot((1515, 1515), (-0.5, 0))
-plt.plot((1630, 1630), (-0.5, 0))
-plt.plot(Wavenumber, H2O_Data_raw[:, idx])
+# idx = 35
+# fig, ax = plt.subplots(figsize=(12, 6))
+# plt.plot((1430, 1430), (-0.5, 0))
+# plt.plot((1515, 1515), (-0.5, 0))
+# plt.plot((1630, 1630), (-0.5, 0))
+# plt.plot(Wavenumber, H2O_Data_raw[:, idx])
 
-plt.title(f"idx:{idx}")
-plt.ylim(-0.5, 0)
-ax.invert_xaxis()
+# plt.title(f"idx:{idx}")
+# plt.ylim(-0.5, 0)
+# ax.invert_xaxis()
 # %%
 plt.plot((1515, 1515), (-0.5, 0))
 
@@ -313,16 +314,17 @@ plt.ylim(-0.5, 0)
 
 # H2O_Data, H2O_Mean_baseline = scale_data(H2O_Data, Wavenumber)
 #%%
-idx = 13
+idx =1
+
 fig, ax = plt.subplots(figsize=(12, 6))
 plt.plot(Wavenumber, Data_raw[:, idx])
 plt.plot(Wavenumber, Data_raw_smoothed[:, idx])
-plt.plot(Wavenumber, np.polyfit(Wavenumber, Data_raw_smoothed[:, idx], 6))
-plt.plot((1635, 1635), (-0.075, 0.1))
-plt.plot((1275, 1275), (-0.075, 0.1))
-plt.plot((1515, 1515), (-0.075, 0.1))
-plt.plot((1430, 1430), (-0.075, 0.1))
-# plt.ylim(-0.05, 0.2)
+#plt.plot(Wavenumber, np.polyfit(Wavenumber, Data_raw_smoothed[:, idx], 6))
+plt.plot((1635, 1635), (-0.5, 0.1))
+plt.plot((1275, 1275), (-0.5, 0.1))
+plt.plot((1515, 1515), (-0.5, 0.1))
+plt.plot((1430, 1430), (-0.5, 0.1))
+plt.ylim(-0.4, 0)
 ax.invert_xaxis()
 
 ax.set_xlabel("Wavenumber")
@@ -441,8 +443,8 @@ plt.savefig("PCA2+mean_plot.png")
 fig, ax = plt.subplots(figsize=(12, 6))
 
 plt.plot(Wavenumber, Mean_baseline, label="Average Baseline", linewidth=3)
-plt.plot(Wavenumber, Mean_baseline + PCA_vectors[2], label="Average Baseline + PCA2")
-plt.plot(Wavenumber, Mean_baseline - PCA_vectors[2], label="Average Baseline - PCA2")
+plt.plot(Wavenumber, Mean_baseline + PCA_vectors[2], label="Average Baseline + PCA3")
+plt.plot(Wavenumber, Mean_baseline - PCA_vectors[2], label="Average Baseline - PCA3")
 # plt.plot(Mean_baseline-PCA_vectors[1]*2, label = 'Average Baseline + PCA2 *2')
 
 plt.legend()
@@ -456,10 +458,10 @@ fig, ax = plt.subplots(figsize=(12, 6))
 
 plt.plot(Wavenumber, Mean_baseline, label="Average Baseline", linewidth=3)
 plt.plot(
-    Wavenumber, Mean_baseline + PCA_vectors[3] * 1, label="Average Baseline + PCA2"
+    Wavenumber, Mean_baseline + PCA_vectors[3] * 1, label="Average Baseline + PCA4"
 )
 plt.plot(
-    Wavenumber, Mean_baseline - PCA_vectors[3] * 1, label="Average Baseline - PCA2"
+    Wavenumber, Mean_baseline - PCA_vectors[3] * 1, label="Average Baseline - PCA4"
 )
 # plt.plot(Mean_baseline-PCA_vectors[1]*2, label = 'Average Baseline + PCA2 *2')
 
@@ -475,10 +477,10 @@ fig, ax = plt.subplots(figsize=(12, 6))
 
 plt.plot(Wavenumber, Mean_baseline, label="Average Baseline", linewidth=3)
 plt.plot(
-    Wavenumber, Mean_baseline + PCA_vectors[4] * 1, label="Average Baseline + PCA2"
+    Wavenumber, Mean_baseline + PCA_vectors[4] * 1, label="Average Baseline + PCA5"
 )
 plt.plot(
-    Wavenumber, Mean_baseline - PCA_vectors[4] * 1, label="Average Baseline - PCA2"
+    Wavenumber, Mean_baseline - PCA_vectors[4] * 1, label="Average Baseline - PCA5"
 )
 # plt.plot(Mean_baseline-PCA_vectors[1]*2, label = 'Average Baseline + PCA2 *2')
 
@@ -487,7 +489,7 @@ ax.invert_xaxis()
 ax.legend()
 ax.set_xlabel("Wavenumber")
 ax.set_ylabel("Absorbance")
-plt.savefig("PCA4+mean_plot.png")
+plt.savefig("PCA5+mean_plot.png")
 # %%
 # Make Dataframes without Water peak for improved to fit
 def H2O_peak_cut(df, wn_cut_low, wn_cut_high, return_DF=False):
@@ -1374,7 +1376,7 @@ def plot_peak_results(Spectrum, Peak_Matrix, fit_param, Wavenumber):
 
 # %%
 
-spec = Good_peaks.values.T[38]
+spec = Good_peaks.values.T[28]
 Peak_Matrix, fit_param = Water_Peak_fit(
     spec, PCA_vectors=Peak_comps_df_full, n_PCA_vectors=2
 )
